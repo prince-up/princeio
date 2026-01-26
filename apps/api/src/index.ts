@@ -55,7 +55,8 @@ app.post("/auth/guest", async (req, reply) => {
 });
 
 const createSessionSchema = z.object({
-  permission: z.enum(["view", "control"]).default("view")
+  permission: z.enum(["view", "control"]).default("view"),
+  password: z.string().optional()
 });
 
 app.post("/sessions", async (req, reply) => {

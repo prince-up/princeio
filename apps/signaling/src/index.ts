@@ -51,6 +51,52 @@ io.on("connection", (socket) => {
     io.to(sessionCode.toUpperCase()).emit("webrtc:ice", { candidate });
   });
 
+  socket.on("control:event", ({ sessionCode, event }) => {
+    const code = sessionCode.toUpperCase();
+    const state = sessions.get(code);
+    if (state?.hostSocketId) {
+      io.to(state.hostSocketId).emit("control:event", event);
+    }
+  });
+
+  // Chat functionality
+  socket.on("chat:message", ({ sessionCode, message, sender }) => {
+    const code = sessionCode.toUpperCase();
+    io.to(code).emit("chat:message", { message, sender, timestamp: Date.now() });
+  });
+
+  // File transfer
+  socket.on("file:offer", ({ sessionCode, fileName, fileSize, fileId }) => {
+    const code = sessionCode.toUpperCase();
+    const state = sessions.get(code);
+    if (state?.hostSocketId) {
+      io.to(state.hostSocketId).emit("file:offer", { fileName, fileSize, fileId, from: socket.id });
+    }
+  });
+
+  socket.on("file:accept", ({ sessionCode, fileId, to }) => {
+    io.to(to).emit("file:accept", { fileId });
+  });
+
+  socket.on("file:chunk", ({ sessionCode, fileId, chunk, to }) => {
+    io.to(to).emit("file:chunk", { fileId, chunk });
+  });
+
+  socket.on("file:complete", ({ sessionCode, fileId, to }) => {
+    io.to(to).emit("file:complete", { fileId });
+  });
+
+  // Screen annotation
+  socket.on("annotation:draw", ({ sessionCode, data }) => {
+    const code = sessionCode.toUpperCase();
+    io.to(code).emit("annotation:draw", data);
+  });
+
+  socket.on("annotation:clear", ({ sessionCode }) => {
+    const code = sessionCode.toUpperCase();
+    io.to(code).emit("annotation:clear");
+  });
+
   socket.on("session:terminate", ({ sessionCode }) => {
     const code = sessionCode.toUpperCase();
     io.to(code).emit("session:terminated", { reason: "host" });
