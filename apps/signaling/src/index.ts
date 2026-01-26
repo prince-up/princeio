@@ -3,7 +3,7 @@ import cors from "@fastify/cors";
 import "dotenv/config";
 import { Server } from "socket.io";
 
-const port = Number(process.env.SIGNALING_PORT ?? 4100);
+const port = Number(process.env.PORT || process.env.SIGNALING_PORT || 4100);
 
 const app = Fastify({ logger: true });
 await app.register(cors, { origin: true });
