@@ -1,0 +1,24 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: princeio
+      POSTGRES_PASSWORD: princeio
+      POSTGRES_DB: princeio
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  coturn:
+    image: coturn/coturn:4
+    command: ["-n", "-c", "/etc/coturn/turnserver.conf"]
+    volumes:
+      - ./infra/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    ports:
+      - "3478:3478"
+      - "3478:3478/udp"
