@@ -8,7 +8,7 @@ import { z } from "zod";
 import "dotenv/config";
 import type { PermissionLevel, SessionRecord } from "@princeio/shared";
 
-const port = Number(process.env.API_PORT ?? 4000);
+const port = Number(process.env.PORT || process.env.API_PORT || 4000);
 const jwtSecret = process.env.JWT_SECRET ?? "dev-secret";
 const ttlSeconds = Number(process.env.SESSION_TTL_SECONDS ?? 3600);
 
