@@ -424,6 +424,38 @@ export default function Home() {
         <div className="card">
           <div className="label">🖥️ Host Control Panel</div>
           <div style={{ marginBottom: '1rem' }}>
+            <div style={{ background: 'rgba(99, 102, 241, 0.1)', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', border: '1px solid var(--primary)' }}>
+              <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+                <strong>🚀 Want to share YOUR screen?</strong>
+              </p>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                To allow remote control, you must run the desktop app.
+              </p>
+              <a
+                href="/download/princeio-win32-x64.zip"
+                download
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  padding: '10px',
+                  background: 'var(--primary)',
+                  color: 'white',
+                  textAlign: 'center',
+                  borderRadius: '6px',
+                  textDecoration: 'none',
+                  fontWeight: 600
+                }}
+              >
+                📥 Download Host App
+              </a>
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--border)', margin: '1.5rem 0', position: 'relative' }}>
+              <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: '#0F172A', padding: '0 10px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                OR (View Only)
+              </span>
+            </div>
+
             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
               Permission Level
             </label>
@@ -432,24 +464,8 @@ export default function Home() {
               <option value="control">🎮 Full Control</option>
             </select>
 
-            <div className="password-container">
-              <label className="password-toggle">
-                <input type="checkbox" checked={usePassword} onChange={(e) => setUsePassword(e.target.checked)} />
-                <span>🔒 Require Password</span>
-              </label>
-              {usePassword && (
-                <input
-                  type="text"
-                  className="password-input"
-                  placeholder="Enter password"
-                  value={sessionPassword}
-                  onChange={(e) => setSessionPassword(e.target.value)}
-                />
-              )}
-            </div>
-
-            <button onClick={createSession} style={{ width: '100%', marginTop: '1rem' }}>
-              Create Session
+            <button onClick={createSession} style={{ width: '100%', marginTop: '0.5rem' }}>
+              Create Web Session
             </button>
           </div>
 
