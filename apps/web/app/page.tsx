@@ -432,7 +432,7 @@ export default function Home() {
                 To allow remote control, you must run the desktop app.
               </p>
               <a
-                href="https://drive.google.com/file/d/1dJuF60RF5u8YUnkRZIMdOU4AVs1bV_cx/view?usp=sharing"
+                href="https://drive.google.com/file/d/1LzL-e0rcUcnyUkcqzP2gH4RBQ_UnFpws/view?usp=sharing"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
