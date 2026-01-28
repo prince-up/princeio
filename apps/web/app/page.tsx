@@ -526,8 +526,10 @@ export default function Home() {
                   onMouseMove={(e) => {
                     if (permission !== 'control' || role !== 'viewer') return;
                     const rect = e.currentTarget.getBoundingClientRect();
-                    const x = Math.floor((e.clientX - rect.left) / rect.width * screen.width);
-                    const y = Math.floor((e.clientY - rect.top) / rect.height * screen.height);
+                    // Send normalized coordinates (0.0 to 1.0)
+                    const x = (e.clientX - rect.left) / rect.width;
+                    const y = (e.clientY - rect.top) / rect.height;
+
                     socketRef.current?.emit('control:event', {
                       sessionCode: sessionCodeRef.current,
                       event: { type: 'mousemove', x, y }
@@ -536,11 +538,24 @@ export default function Home() {
                   onClick={(e) => {
                     if (permission !== 'control' || role !== 'viewer') return;
                     const rect = e.currentTarget.getBoundingClientRect();
-                    const x = Math.floor((e.clientX - rect.left) / rect.width * screen.width);
-                    const y = Math.floor((e.clientY - rect.top) / rect.height * screen.height);
+                    const x = (e.clientX - rect.left) / rect.width;
+                    const y = (e.clientY - rect.top) / rect.height;
+
                     socketRef.current?.emit('control:event', {
                       sessionCode: sessionCodeRef.current,
                       event: { type: 'click', x, y, button: 'left' }
+                    });
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    if (permission !== 'control' || role !== 'viewer') return;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = (e.clientX - rect.left) / rect.width;
+                    const y = (e.clientY - rect.top) / rect.height;
+
+                    socketRef.current?.emit('control:event', {
+                      sessionCode: sessionCodeRef.current,
+                      event: { type: 'click', x, y, button: 'right' }
                     });
                   }}
                   tabIndex={0}

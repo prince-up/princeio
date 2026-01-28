@@ -45,7 +45,7 @@ async function createSession(permission: 'view' | 'control') {
             throw new Error(`Failed to create session: ${response.status}`);
         }
 
-        const data = await response.json();
+        const data = await response.json() as any;
         sessionCode = data.sessionCode;
         isControlEnabled = permission === 'control';
 
@@ -81,6 +81,14 @@ function connectSignaling() {
         handleControlEvent(event);
     });
 
+    socket.on('webrtc:answer', ({ sdp }) => {
+        mainWindow?.webContents.send('webrtc:answer', { sdp });
+    });
+
+    socket.on('webrtc:ice', ({ candidate }) => {
+        mainWindow?.webContents.send('webrtc:ice', candidate);
+    });
+
     socket.on('disconnect', () => {
         console.log('Disconnected from signaling server');
     });
@@ -90,17 +98,25 @@ function connectSignaling() {
 function handleControlEvent(event: any) {
     try {
         const { type, x, y, button, key, keyCode, modifiers } = event;
+        const screenSize = robot.getScreenSize();
+        const width = screenSize.width;
+        const height = screenSize.height;
+
+        // Convert normalized coordinates (0-1) to screen pixels
+        // If x,y are > 1, assume they are legacy absolute pixels and leave them alone
+        const targetX = (x <= 1 ? x * width : x);
+        const targetY = (y <= 1 ? y * height : y);
 
         switch (type) {
             case 'mousemove':
                 if (typeof x === 'number' && typeof y === 'number') {
-                    robot.moveMouse(x, y);
+                    robot.moveMouse(targetX, targetY);
                 }
                 break;
 
             case 'mousedown':
                 if (typeof x === 'number' && typeof y === 'number') {
-                    robot.moveMouse(x, y);
+                    robot.moveMouse(targetX, targetY);
                     robot.mouseToggle('down', button || 'left');
                 }
                 break;
@@ -111,14 +127,14 @@ function handleControlEvent(event: any) {
 
             case 'click':
                 if (typeof x === 'number' && typeof y === 'number') {
-                    robot.moveMouse(x, y);
+                    robot.moveMouse(targetX, targetY);
                     robot.mouseClick(button || 'left');
                 }
                 break;
 
             case 'dblclick':
                 if (typeof x === 'number' && typeof y === 'number') {
-                    robot.moveMouse(x, y);
+                    robot.moveMouse(targetX, targetY);
                     robot.mouseClick(button || 'left', true);
                 }
                 break;
@@ -177,6 +193,21 @@ function cleanup() {
         socket = null;
     }
 }
+
+// WebRTC Signaling Relay
+ipcMain.on('webrtc:offer', (event, { sdp }) => {
+    socket?.emit('webrtc:offer', { sessionCode, sdp });
+});
+
+ipcMain.on('webrtc:ice', (event, candidate) => {
+    socket?.emit('webrtc:ice', { sessionCode, candidate });
+});
+
+// IPC handlers
+ipcMain.handle('get-sources', async () => {
+    const sources = await desktopCapturer.getSources({ types: ['screen'] });
+    return sources;
+});
 
 // IPC handlers
 ipcMain.handle('create-session', async (event, permission: 'view' | 'control') => {
