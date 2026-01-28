@@ -432,8 +432,9 @@ export default function Home() {
                 To allow remote control, you must run the desktop app.
               </p>
               <a
-                href="/download/princeio-win32-x64.zip"
-                download
+                href="https://drive.google.com/drive/folders/1XIr3bV18l05Xqsa7zvLQUS9-LhgbABcB?usp=sharing"
+                target="_blank"
+                rel="noopener noreferrer"
                 style={{
                   display: 'block',
                   width: '100%',
