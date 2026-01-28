@@ -212,11 +212,12 @@ export default function Home() {
   const joinSession = async () => {
     setStatus("joining");
     try {
-      const res = await fetch(`${API_URL}/sessions/${sessionCode}/join`, {
+      const baseUrl = API_URL.replace(/\/$/, "");
+      const res = await fetch(`${baseUrl}/sessions/${sessionCode}/join`, {
         method: "POST"
       });
       if (!res.ok) {
-        addLog(`Join failed: ${res.status}`);
+        addLog(`Join failed: ${res.status} ${res.statusText}`);
         setStatus("error");
         return;
       }
@@ -246,7 +247,8 @@ export default function Home() {
   const createSession = async () => {
     setStatus("creating");
     try {
-      const res = await fetch(`${API_URL}/sessions`, {
+      const baseUrl = API_URL.replace(/\/$/, "");
+      const res = await fetch(`${baseUrl}/sessions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -255,7 +257,14 @@ export default function Home() {
         })
       });
       if (!res.ok) {
-        addLog(`Create failed: ${res.status}`);
+        addLog(`Create failed: ${res.status} ${res.statusText}`);
+        try {
+          const errorData = await res.text();
+          console.error("Create session error detail:", errorData);
+          addLog(`Error details: ${errorData.slice(0, 50)}`);
+        } catch (e) {
+          console.error("Could not read error body", e);
+        }
         setStatus("error");
         return;
       }
