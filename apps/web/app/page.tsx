@@ -449,6 +449,14 @@ export default function Home() {
               >
                 📥 Download Host App
               </a>
+              <div style={{ marginTop: '0.8rem', fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'left' }}>
+                <strong>Instructions:</strong>
+                <ol style={{ paddingLeft: '1.2rem', margin: '0.5rem 0 0' }}>
+                  <li style={{ marginBottom: '0.2rem' }}>Download & Extract the Zip file</li>
+                  <li style={{ marginBottom: '0.2rem' }}>Open folder & run <code>princeio.exe</code></li>
+                  <li>Click "More Info" &rarr; "Run" if warned</li>
+                </ol>
+              </div>
             </div>
 
             <div style={{ borderTop: '1px solid var(--border)', margin: '1.5rem 0', position: 'relative' }}>
