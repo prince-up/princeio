@@ -6,49 +6,35 @@ import { usePathname } from 'next/navigation';
 export default function Navbar() {
     const pathname = usePathname();
 
-    const isActive = (path: string) => pathname === path ? 'text-white font-bold' : 'text-gray-400 hover:text-white';
+    // Helper to check active state if we wanted to style active links differently
+    const isActive = (path: string) => pathname === path;
 
     return (
-        <nav className="fixed top-0 left-0 right-0 z-50 pointer-events-none">
-            <div className="max-w-7xl mx-auto px-6 py-4">
-                <div className="bg-[#1E293B]/80 backdrop-blur-md border border-white/10 rounded-2xl px-6 py-3 flex items-center justify-between shadow-2xl pointer-events-auto">
+        <nav>
+            <div className="nav-glass">
+                {/* Logo */}
+                <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 'bold', fontSize: '1.2rem', color: 'white' }}>
+                    <div style={{ width: '30px', height: '30px', background: 'linear-gradient(135deg, #6366f1, #a855f7)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>P</div>
+                    PrinceIO
+                </Link>
 
-                    {/* Logo */}
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center">
-                            <span className="text-white font-bold text-lg">P</span>
-                        </div>
-                        <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
-                            PrinceIO
-                        </span>
-                    </div>
+                {/* Links - Hidden on mobile in the original design, but we can make them visible on larger screens if we had media queries. 
+                    For now, following the 'nav-glass' structure which uses flex justify-between. 
+                    We'll insert a middle section for links. */}
+                <div className="flex gap-4" style={{ display: 'flex', gap: '2rem' }}>
+                    <Link href="/features" style={{ color: isActive('/features') ? 'white' : '#94a3b8' }}>Features</Link>
+                    <Link href="/pricing" style={{ color: isActive('/pricing') ? 'white' : '#94a3b8' }}>Pricing</Link>
+                    <Link href="/download" style={{ color: isActive('/download') ? 'white' : '#94a3b8' }}>Download</Link>
+                </div>
 
-                    {/* Links */}
-                    <div className="hidden md:flex items-center gap-8">
-                        <Link href="/" className={`transition-colors text-sm ${isActive('/')}`}>
-                            Product
-                        </Link>
-                        <Link href="/guidelines" className={`transition-colors text-sm ${isActive('/guidelines')}`}>
-                            Guidelines
-                        </Link>
-                        <a href="#features" className="text-gray-400 hover:text-white text-sm transition-colors">
-                            Features
-                        </a>
-                        <a href="#download" className="text-gray-400 hover:text-white text-sm transition-colors">
-                            Download
-                        </a>
-                    </div>
-
-                    {/* CTA */}
-                    <div className="flex items-center gap-4">
-                        <Link href="/guidelines" className="text-sm font-medium text-gray-300 hover:text-white transition-colors">
-                            Help Center
-                        </Link>
-                        <a href="https://drive.google.com/file/d/1LZt6c1lblyhxLXoJsv9CTAiUdDlu4Stk/view?usp=sharing" target="_blank"
-                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-lg text-sm font-semibold transition-all shadow-lg shadow-indigo-500/20">
-                            Get App
-                        </a>
-                    </div>
+                {/* CTA */}
+                <div className="flex items-center gap-4">
+                    <Link href="/help-center" style={{ color: '#94a3b8', fontSize: '0.9rem', marginRight: '1rem' }}>
+                        Help
+                    </Link>
+                    <a href="https://drive.google.com/file/d/1LZt6c1lblyhxLXoJsv9CTAiUdDlu4Stk/view?usp=sharing" target="_blank" className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}>
+                        Get App
+                    </a>
                 </div>
             </div>
         </nav>

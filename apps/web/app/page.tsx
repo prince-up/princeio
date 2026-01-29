@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import Chatbot from '../components/Chatbot';
+import Footer from '../components/Footer';
 
 // --- CONFIG ---
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://princeio-api.onrender.com';
@@ -219,49 +220,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <footer>
-        <div className="footer-content">
-          <div className="footer-col">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem', fontWeight: 'bold' }}>
-              <div style={{ width: '24px', height: '24px', background: 'linear-gradient(135deg, #6366f1, #a855f7)', borderRadius: '6px', textAlign: 'center', lineHeight: '24px', fontSize: '14px' }}>P</div>
-              PrinceIO
-            </div>
-            <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>
-              The next generation of remote desktop control. Fast, secure, and beautiful.
-            </p>
-          </div>
-          <div className="footer-col">
-            <h4>Product</h4>
-            <ul>
-              <li>Features</li>
-              <li>Security</li>
-              <li>Download</li>
-              <li>Pricing</li>
-            </ul>
-          </div>
-          <div className="footer-col">
-            <h4>Resources</h4>
-            <ul>
-              <li>Help Center</li>
-              <li>API Docs</li>
-              <li>Community</li>
-              <li>Status</li>
-            </ul>
-          </div>
-          <div className="footer-col">
-            <h4>Company</h4>
-            <ul>
-              <li>About</li>
-              <li>Blog</li>
-              <li>Careers</li>
-              <li>Contact</li>
-            </ul>
-          </div>
-        </div>
-        <div className="copyright">
-          &copy; 2026 PrinceIO. All rights reserved.
-        </div>
-      </footer>
+      <Footer />
 
       <Chatbot />
     </main>
