@@ -53,62 +53,71 @@ export default function Chatbot() {
 
             {/* Chat Window */}
             {isOpen && (
-                <div className="mb-4 w-80 md:w-96 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col transition-all animate-fade-in-up">
+                <div className="mb-4 w-80 bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col transition-all animate-fade-in-up" style={{ height: '450px', boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
                     {/* Header */}
-                    <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 flex items-center justify-between">
+                    <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 p-4 flex items-center justify-between shadow-lg">
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-white">
+                            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-white text-lg backdrop-blur-sm shadow-inner">
                                 🤖
                             </div>
                             <div>
-                                <h3 className="text-white font-bold text-sm">PrinceIO Support</h3>
-                                <p className="text-indigo-100 text-xs">Always here to help</p>
+                                <h3 className="text-white font-bold text-sm tracking-wide">PrinceIO</h3>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
+                                    <p className="text-indigo-100 text-xs font-medium">Online Support</p>
+                                </div>
                             </div>
                         </div>
-                        <button onClick={() => setIsOpen(false)} className="text-white/80 hover:text-white">
+                        <button onClick={() => setIsOpen(false)} className="text-white/70 hover:text-white transition-colors p-1 hover:bg-white/10 rounded-lg">
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                     </div>
 
                     {/* Messages */}
-                    <div className="flex-1 p-4 h-80 overflow-y-auto bg-slate-900/50 space-y-3">
+                    <div className="flex-1 p-4 overflow-y-auto space-y-4 scrollbar-hide">
                         {messages.map((msg) => (
-                            <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${msg.sender === 'user'
-                                    ? 'bg-indigo-600 text-white rounded-tr-sm'
-                                    : 'bg-slate-700 text-slate-200 rounded-tl-sm'}`}>
+                            <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}>
+                                <div className={`max-w-[85%] p-3.5 text-sm shadow-md ${msg.sender === 'user'
+                                    ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-2xl rounded-tr-sm'
+                                    : 'bg-slate-800/80 border border-white/5 text-slate-200 rounded-2xl rounded-tl-sm backdrop-blur-md'}`}>
                                     {msg.text}
                                 </div>
                             </div>
                         ))}
                         {isTyping && (
-                            <div className="flex justify-start">
-                                <div className="bg-slate-700 text-slate-400 p-3 rounded-2xl rounded-tl-sm text-xs flex gap-1">
-                                    <span className="animate-bounce">●</span>
-                                    <span className="animate-bounce delay-100">●</span>
-                                    <span className="animate-bounce delay-200">●</span>
+                            <div className="flex justify-start animate-fade-in">
+                                <div className="bg-slate-800/80 border border-white/5 text-slate-400 p-3 rounded-2xl rounded-tl-sm text-xs flex gap-1.5 items-center backdrop-blur-md shadow-sm">
+                                    <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></div>
+                                    <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce delay-100"></div>
+                                    <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce delay-200"></div>
                                 </div>
                             </div>
                         )}
                         <div ref={bottomRef} />
                     </div>
 
-                    {/* Input */}
-                    <div className="p-3 bg-slate-800 border-t border-slate-700 flex gap-2">
-                        <input
-                            type="text"
-                            className="flex-1 bg-slate-900 border border-slate-600 rounded-full px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
-                            placeholder="Type a message..."
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                        />
-                        <button
-                            onClick={handleSend}
-                            className="bg-indigo-600 hover:bg-indigo-500 text-white p-2 rounded-full transition-colors"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
-                        </button>
+                    {/* Input Footer */}
+                    <div className="p-4 bg-slate-900/80 border-t border-white/5 backdrop-blur-md">
+                        <div className="relative flex items-center">
+                            <input
+                                type="text"
+                                className="w-full bg-slate-800/50 border border-white/10 rounded-xl pl-4 pr-12 py-3 text-sm text-white focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all placeholder-slate-500"
+                                placeholder="Type your message..."
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                            />
+                            <button
+                                onClick={handleSend}
+                                disabled={!input.trim()}
+                                className="absolute right-1.5 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 text-white p-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/20"
+                            >
+                                <svg className="w-4 h-4 transform rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+                            </button>
+                        </div>
+                        <div className="text-center mt-2">
+                            <span className="text-[10px] text-slate-500 font-medium">Powered by PrinceIO AI</span>
+                        </div>
                     </div>
                 </div>
             )}

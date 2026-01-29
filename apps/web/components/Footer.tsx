@@ -36,9 +36,7 @@ export default function Footer() {
                     <h4>Resources</h4>
                     <ul>
                         <li><Link href="/help-center">Help Center</Link></li>
-                        <li><Link href="/api-docs">API Docs</Link></li>
                         <li><Link href="/community">Community</Link></li>
-                        <li><Link href="/status">Status</Link></li>
                     </ul>
                 </div>
 

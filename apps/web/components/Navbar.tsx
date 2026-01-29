@@ -25,6 +25,8 @@ export default function Navbar() {
                     <Link href="/features" style={{ color: isActive('/features') ? 'white' : '#94a3b8' }}>Features</Link>
                     <Link href="/pricing" style={{ color: isActive('/pricing') ? 'white' : '#94a3b8' }}>Pricing</Link>
                     <Link href="/download" style={{ color: isActive('/download') ? 'white' : '#94a3b8' }}>Download</Link>
+                    <Link href="/about" style={{ color: isActive('/about') ? 'white' : '#94a3b8' }}>About</Link>
+                    <Link href="/contact" style={{ color: isActive('/contact') ? 'white' : '#94a3b8' }}>Contact</Link>
                 </div>
 
                 {/* CTA */}
