@@ -26,6 +26,8 @@ export default function LandingPage() {
   const [status, setStatus] = useState('');
   const [socket, setSocket] = useState<Socket | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [showControls, setShowControls] = useState(true);
 
   // --- SESSION LOGIC ---
   useEffect(() => {
@@ -87,19 +89,51 @@ export default function LandingPage() {
       if (pc) await pc.addIceCandidate(new RTCIceCandidate(candidate));
     });
 
-    // INPUT HANDLING
+    // INPUT HANDLING - IMPROVED PRECISION
     const handleInput = (e: MouseEvent | KeyboardEvent) => {
-      if (!videoRef.current || videoRef.current.videoWidth === 0) return;
+      const video = videoRef.current;
+      if (!video || video.videoWidth === 0) return;
+
+      const rect = video.getBoundingClientRect();
+      const vidW = video.videoWidth;
+      const vidH = video.videoHeight;
       const eventData: any = { type: e.type };
 
+      // Calculate the actual displayed dimensions of the video content (accounting for object-fit: contain)
+      const elementRatio = rect.width / rect.height;
+      const videoRatio = vidW / vidH;
+
+      let drawWidth = rect.width;
+      let drawHeight = rect.height;
+      let startX = 0;
+      let startY = 0;
+
+      if (elementRatio > videoRatio) {
+        // Container is wider than video -> Pillars on sides
+        drawWidth = rect.height * videoRatio;
+        startX = (rect.width - drawWidth) / 2;
+      } else {
+        // Container is taller than video -> Letterbox on top/bottom
+        drawHeight = rect.width / videoRatio;
+        startY = (rect.height - drawHeight) / 2;
+      }
+
       if (e instanceof MouseEvent) {
-        const rect = videoRef.current.getBoundingClientRect();
-        const scaleX = videoRef.current.videoWidth / rect.width;
-        const scaleY = videoRef.current.videoHeight / rect.height;
-        eventData.x = (e.clientX - rect.left) * scaleX;
-        eventData.y = (e.clientY - rect.top) * scaleY;
+        const clientX = e.clientX - rect.left;
+        const clientY = e.clientY - rect.top;
+
+        // Ignore clicks on black bars
+        if (clientX < startX || clientX > startX + drawWidth ||
+          clientY < startY || clientY > startY + drawHeight) {
+          return;
+        }
+
+        // Map to video source coordinates
+        eventData.x = (clientX - startX) * (vidW / drawWidth);
+        eventData.y = (clientY - startY) * (vidH / drawHeight);
         eventData.button = e.button === 0 ? 'left' : e.button === 2 ? 'right' : 'middle';
       }
+
       if (e instanceof KeyboardEvent) {
         eventData.key = e.key;
         eventData.keyCode = e.keyCode;
@@ -108,6 +142,7 @@ export default function LandingPage() {
         if (e.shiftKey) eventData.modifiers.push('shift');
         if (e.altKey) eventData.modifiers.push('alt');
       }
+
       newSocket.emit('control:event', { sessionCode, event: eventData });
     };
 
@@ -118,16 +153,56 @@ export default function LandingPage() {
     window.addEventListener('keyup', handleInput);
   };
 
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
   if (view === 'session') {
     return (
-      <div style={{ position: 'fixed', inset: 0, background: 'black', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div
+        ref={containerRef}
+        className="group"
+        style={{ position: 'fixed', inset: 0, background: 'black', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        onMouseMove={() => { setShowControls(true); setTimeout(() => setShowControls(false), 3000); }}
+      >
         {status && (
-          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(0,0,0,0.8)', padding: '20px', borderRadius: '50px', color: 'white', zIndex: 100 }}>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-slate-900/90 border border-white/10 px-8 py-4 rounded-full text-white backdrop-blur-md z-50 flex items-center gap-3 shadow-2xl">
+            <div className="w-2 h-2 bg-indigo-500 rounded-full animate-ping"></div>
             {status}
           </div>
         )}
-        <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'contain' }} onContextMenu={(e) => e.preventDefault()} />
-        <button onClick={() => window.location.reload()} className="btn btn-secondary" style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 100 }}>Exit</button>
+
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: showControls ? 'default' : 'none' }}
+          onContextMenu={(e) => e.preventDefault()}
+        />
+
+        {/* Control Bar */}
+        <div
+          className={`fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-slate-900/80 backdrop-blur-md border border-white/10 px-6 py-3 rounded-2xl flex items-center gap-6 transition-all duration-300 z-50 shadow-2xl ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}
+        >
+          <button onClick={toggleFullscreen} className="text-white/70 hover:text-white transition-colors flex flex-col items-center gap-1 group/btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" /></svg>
+            <span className="text-[10px] opacity-0 group-hover/btn:opacity-100 transition-opacity absolute -top-6 bg-black px-2 py-1 rounded">Fullscreen</span>
+          </button>
+
+          <div className="w-px h-6 bg-white/10"></div>
+
+          <button onClick={() => window.location.reload()} className="text-red-400 hover:text-red-300 transition-colors flex flex-col items-center gap-1 group/btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0" /><line x1="12" x2="12" y1="2" y2="12" /></svg>
+            <span className="text-[10px] opacity-0 group-hover/btn:opacity-100 transition-opacity absolute -top-6 bg-black px-2 py-1 rounded text-red-400">Disconnect</span>
+          </button>
+        </div>
       </div>
     );
   }
