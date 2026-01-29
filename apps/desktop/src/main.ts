@@ -66,11 +66,28 @@ async function createSession(permission: 'view' | 'control') {
 function connectSignaling() {
     if (socket) return;
 
-    socket = io(SIGNALING_URL, { transports: ['websocket'] });
+    console.log('Connecting to signaling server:', SIGNALING_URL);
+    socket = io(SIGNALING_URL, {
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 1000,
+        timeout: 20000
+    });
 
     socket.on('connect', () => {
-        console.log('Connected to signaling server');
+        console.log('Connected to signaling server, socket id:', socket?.id);
+        console.log('Registering session:', sessionCode);
         socket?.emit('host:register', { sessionCode });
+    });
+
+    socket.on('reconnect', () => {
+        console.log('Reconnected to signaling server, re-registering session:', sessionCode);
+        socket?.emit('host:register', { sessionCode });
+    });
+
+    socket.on('connect_error', (error) => {
+        console.error('Signaling connection error:', error.message);
     });
 
     socket.on('viewer:joined', () => {
@@ -92,9 +109,17 @@ function connectSignaling() {
         mainWindow?.webContents.send('webrtc:ice', candidate);
     });
 
-    socket.on('disconnect', () => {
-        console.log('Disconnected from signaling server');
+    socket.on('disconnect', (reason) => {
+        console.log('Disconnected from signaling server:', reason);
     });
+
+    // Keep-alive ping every 30 seconds to prevent Render from spinning down
+    setInterval(() => {
+        if (socket?.connected && sessionCode) {
+            socket.emit('host:register', { sessionCode });
+            console.log('Keep-alive: re-registered session', sessionCode);
+        }
+    }, 30000);
 }
 
 // Handle control events (mouse, keyboard)
