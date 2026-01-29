@@ -15,27 +15,8 @@ const ICE_SERVERS = {
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun.relay.metered.ca:80' },
-    {
-      urls: 'turn:global.relay.metered.ca:80',
-      username: 'a8cdc17c6b6dbe4db7a3f24c',
-      credential: 'Ht9CFVE+1i1SY8DF'
-    },
-    {
-      urls: 'turn:global.relay.metered.ca:80?transport=tcp',
-      username: 'a8cdc17c6b6dbe4db7a3f24c',
-      credential: 'Ht9CFVE+1i1SY8DF'
-    },
-    {
-      urls: 'turn:global.relay.metered.ca:443',
-      username: 'a8cdc17c6b6dbe4db7a3f24c',
-      credential: 'Ht9CFVE+1i1SY8DF'
-    },
-    {
-      urls: 'turns:global.relay.metered.ca:443?transport=tcp',
-      username: 'a8cdc17c6b6dbe4db7a3f24c',
-      credential: 'Ht9CFVE+1i1SY8DF'
-    }
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' }
   ],
   iceCandidatePoolSize: 10,
 };
