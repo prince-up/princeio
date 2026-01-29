@@ -213,7 +213,8 @@ ipcMain.handle('get-sources', async () => {
 });
 
 // IPC handlers
-ipcMain.handle('create-session', async (event, permission: 'view' | 'control') => {
+ipcMain.handle('create-session', async (event, data: { permission: 'view' | 'control' }) => {
+    const permission = typeof data === 'string' ? data : data.permission;
     return await createSession(permission);
 });
 

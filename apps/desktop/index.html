@@ -326,6 +326,12 @@
             </button>
 
             <button class="text-btn" id="toggleAuth">Create a free account</button>
+
+            <!-- DEV ONLY -->
+            <button id="devSkipBtn"
+                style="margin-top:20px; font-size:12px; opacity:0.5; border:1px dashed #64748b; padding:5px; width:100%; color:#64748b; background:transparent; cursor:pointer;">
+                [DEV] Skip Login (Test Screen Share)
+            </button>
         </div>
 
         <!-- DASHBOARD VIEW -->
@@ -348,6 +354,9 @@
                 <i class="fa-solid fa-play"></i>
                 <span>Generate Code</span>
             </button>
+
+            <!-- Dev Log Container for Dashboard -->
+            <div id="dashboardLogs" style="margin-top:20px; font-size:10px; color:#ef4444; text-align:center;"></div>
         </div>
 
         <!-- ACTIVE SESSION VIEW -->
@@ -375,6 +384,12 @@
 
             <p style="margin-bottom: 24px; font-size: 13px;">Sharing your screen...</p>
 
+            <!-- Debug Logs -->
+            <div id="debugParams"
+                style="margin-top:20px; font-size:10px; color:#64748b; text-align:left; max-height:100px; overflow-y:auto; background:rgba(0,0,0,0.3); padding:10px; border-radius:8px;">
+                <div>Debug Logs:</div>
+            </div>
+
             <button class="btn btn-danger" id="terminateBtn">
                 <i class="fa-solid fa-stop"></i>
                 <span>Stop Session</span>
@@ -384,6 +399,23 @@
     </div>
 
     <script>
+        // Debug Logger
+        function log(msg) {
+            console.log(msg);
+            const el = document.getElementById('debugParams');
+            const dashLog = document.getElementById('dashboardLogs');
+
+            if (el) {
+                const line = document.createElement('div');
+                line.innerText = `> ${msg}`;
+                el.appendChild(line);
+                el.scrollTop = el.scrollHeight;
+            }
+            if (dashLog) {
+                dashLog.innerText = msg;
+            }
+        }
+
         const { ipcRenderer, clipboard } = require('electron');
         const { createClient } = require('@supabase/supabase-js');
 
@@ -406,16 +438,29 @@
             views[name].classList.remove('hidden');
         };
 
+        // SKIP LOGIN
+        document.getElementById('devSkipBtn').onclick = () => {
+            switchView('dashboard');
+            log('Skipped Login (Dev Mode)');
+        };
+
         // AUTH LOGIC
         async function init() {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) switchView('dashboard');
-            else switchView('auth');
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                if (error) log('Auth Init Error: ' + error.message);
 
-            supabase.auth.onAuthStateChange((event, session) => {
                 if (session) switchView('dashboard');
                 else switchView('auth');
-            });
+
+                supabase.auth.onAuthStateChange((event, session) => {
+                    log(`Auth Change: ${event}`);
+                    if (session) switchView('dashboard');
+                    else switchView('auth');
+                });
+            } catch (e) {
+                log('Critical Auth Error: ' + e.message);
+            }
         }
         init();
 
@@ -450,82 +495,121 @@
                     // Auto login usually happens
                 }
             } catch (e) {
-                alert(e.message);
+                console.error(e);
+                alert('Login Failed: ' + e.message);
+                log('Login Error: ' + e.message);
             } finally {
                 authBtn.disabled = false;
             }
         };
 
-        document.getElementById('logoutBtn').onclick = async () => {
-            // Confirm logout
-            if (confirm('Log out?')) await supabase.auth.signOut();
-        };
-
-        // SESSION LOGIC
+        // SESSION MANAGEMENT
         const createBtn = document.getElementById('createBtn');
-        const termBtn = document.getElementById('terminateBtn');
-        const codeEl = document.getElementById('sessionCode');
+        const terminateBtn = document.getElementById('terminateBtn');
+        const sessionCodeEl = document.getElementById('sessionCode');
         const connStatus = document.getElementById('connStatus');
+        const permissionEl = document.getElementById('permission');
+        const logoutBtn = document.getElementById('logoutBtn');
 
         createBtn.onclick = async () => {
             createBtn.disabled = true;
-            createBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Creating...</span>';
-
+            log('Creating Session...');
             try {
-                const permission = document.getElementById('permission').value;
-                const session = await ipcRenderer.invoke('create-session', permission);
-
-                codeEl.innerText = session.sessionCode;
+                const permission = permissionEl.value;
+                const result = await ipcRenderer.invoke('create-session', { permission });
+                log(`Session Created: ${result.sessionCode}`);
+                sessionCodeEl.innerText = result.sessionCode;
                 switchView('session');
             } catch (e) {
-                alert('Connection Error: ' + e.message + '\n\nTry checking internet connection.');
+                log('Error creating session: ' + e.message);
+                alert('Failed to create session: ' + e.message);
             } finally {
                 createBtn.disabled = false;
-                createBtn.innerHTML = '<i class="fa-solid fa-play"></i><span>Generate Code</span>';
             }
         };
 
-        termBtn.onclick = async () => {
+        terminateBtn.onclick = async () => {
             await cleanup();
             switchView('dashboard');
         };
 
-        window.copyCode = () => {
-            const code = codeEl.innerText;
-            if (code !== '---') {
+        logoutBtn.onclick = async () => {
+            await supabase.auth.signOut();
+            switchView('auth');
+        };
+
+        function copyCode() {
+            const code = sessionCodeEl.innerText;
+            if (code && code !== '---') {
                 clipboard.writeText(code);
                 alert('Code copied to clipboard!');
             }
-        };
+        }
 
         // WEBRTC
         let pc = null;
         let localStream = null;
         const iceServers = [
             { urls: "stun:stun.l.google.com:19302" },
+            { urls: "stun:stun1.l.google.com:19302" },
+            { urls: "stun:stun2.l.google.com:19302" },
+            { urls: "stun:stun.relay.metered.ca:80" },
             {
-                urls: 'turn:openrelay.metered.ca:80',
-                username: 'openrelayproject',
-                credential: 'openrelayproject'
+                urls: "turn:global.relay.metered.ca:80",
+                username: "a8cdc17c6b6dbe4db7a3f24c",
+                credential: "Ht9CFVE+1i1SY8DF"
             },
             {
-                urls: 'turn:openrelay.metered.ca:443',
-                username: 'openrelayproject',
-                credential: 'openrelayproject'
+                urls: "turn:global.relay.metered.ca:80?transport=tcp",
+                username: "a8cdc17c6b6dbe4db7a3f24c",
+                credential: "Ht9CFVE+1i1SY8DF"
+            },
+            {
+                urls: "turn:global.relay.metered.ca:443",
+                username: "a8cdc17c6b6dbe4db7a3f24c",
+                credential: "Ht9CFVE+1i1SY8DF"
+            },
+            {
+                urls: "turns:global.relay.metered.ca:443?transport=tcp",
+                username: "a8cdc17c6b6dbe4db7a3f24c",
+                credential: "Ht9CFVE+1i1SY8DF"
             }
         ];
 
         ipcRenderer.on('viewer-joined', () => {
             connStatus.innerText = 'Connected - Sharing Screen';
             connStatus.style.color = '#4ade80';
+            log('Viewer Joined! Starting Share...');
             startScreenShare();
+        });
+
+        // HANDLE ANSWER FROM VIEWER
+        ipcRenderer.on('webrtc:answer', async (event, { sdp }) => {
+            log('Received Answer from Viewer');
+            if (pc) {
+                try {
+                    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+                    log('Remote Description Set (Connected)');
+                } catch (e) {
+                    log('Error setting remote desc: ' + e.message);
+                }
+            }
+        });
+
+        // HANDLE ICE CANDIDATES FROM VIEWER
+        ipcRenderer.on('webrtc:ice', async (event, candidate) => {
+            // log('Received ICE Candidate'); // Too spammy
+            if (pc && candidate) {
+                await pc.addIceCandidate(new RTCIceCandidate(candidate));
+            }
         });
 
         async function startScreenShare() {
             try {
+                log('Getting Screen Sources...');
                 const sources = await ipcRenderer.invoke('get-sources');
-                // Use the FIRST screen available
                 const source = sources[0];
+                log(`Source found: ${source?.name}`);
 
                 const stream = await navigator.mediaDevices.getUserMedia({
                     audio: false,
@@ -541,6 +625,7 @@
                         }
                     }
                 });
+                log('Got User Media Stream');
 
                 // Set Local Preview
                 const preview = document.getElementById('localPreview');
@@ -548,18 +633,26 @@
 
                 localStream = stream;
                 pc = new RTCPeerConnection({ iceServers });
+
+                pc.onconnectionstatechange = () => {
+                    log(`Connection State: ${pc.connectionState}`);
+                };
+
                 stream.getTracks().forEach(t => pc.addTrack(t, stream));
 
                 pc.onicecandidate = e => {
                     if (e.candidate) ipcRenderer.send('webrtc:ice', JSON.parse(JSON.stringify(e.candidate)));
                 };
 
+                log('Creating Offer...');
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
                 ipcRenderer.send('webrtc:offer', { sdp: JSON.parse(JSON.stringify(offer)) });
+                log('Offer Sent to Signaling Server');
 
             } catch (e) {
                 console.error(e);
+                log('Error: ' + e.message);
                 alert('Screen Share Error: ' + e.message);
             }
         }
