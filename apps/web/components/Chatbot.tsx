@@ -116,9 +116,25 @@ export default function Chatbot() {
             {/* Toggle Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className={`${isOpen ? 'rotate-90 scale-0 opacity-0' : 'scale-100 opacity-100'} transition-all bg-indigo-600 hover:bg-indigo-500 text-white p-4 rounded-full shadow-lg shadow-indigo-600/30 flex items-center justify-center`}
+                style={{
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+                    border: 'none',
+                    color: 'white',
+                    boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.4)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'transform 0.2s'
+                }}
+                className={isOpen ? 'rotate-90' : ''}
             >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
             </button>
         </div>
     );

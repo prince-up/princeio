@@ -219,8 +219,48 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <footer style={{ borderTop: '1px solid var(--glass-border)', padding: '50px 0', textAlign: 'center', color: 'var(--text-gray)' }}>
-        <p>&copy; 2026 PrinceIO. All rights reserved.</p>
+      <footer>
+        <div className="footer-content">
+          <div className="footer-col">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem', fontWeight: 'bold' }}>
+              <div style={{ width: '24px', height: '24px', background: 'linear-gradient(135deg, #6366f1, #a855f7)', borderRadius: '6px', textAlign: 'center', lineHeight: '24px', fontSize: '14px' }}>P</div>
+              PrinceIO
+            </div>
+            <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>
+              The next generation of remote desktop control. Fast, secure, and beautiful.
+            </p>
+          </div>
+          <div className="footer-col">
+            <h4>Product</h4>
+            <ul>
+              <li>Features</li>
+              <li>Security</li>
+              <li>Download</li>
+              <li>Pricing</li>
+            </ul>
+          </div>
+          <div className="footer-col">
+            <h4>Resources</h4>
+            <ul>
+              <li>Help Center</li>
+              <li>API Docs</li>
+              <li>Community</li>
+              <li>Status</li>
+            </ul>
+          </div>
+          <div className="footer-col">
+            <h4>Company</h4>
+            <ul>
+              <li>About</li>
+              <li>Blog</li>
+              <li>Careers</li>
+              <li>Contact</li>
+            </ul>
+          </div>
+        </div>
+        <div className="copyright">
+          &copy; 2026 PrinceIO. All rights reserved.
+        </div>
       </footer>
 
       <Chatbot />
