@@ -1,713 +1,287 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { io, Socket } from "socket.io-client";
+import { useState, useEffect, useRef } from 'react';
+import { io, Socket } from 'socket.io-client';
+import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
+import Chatbot from '../components/Chatbot';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-const SIGNALING_URL = process.env.NEXT_PUBLIC_SIGNALING_URL ?? "http://localhost:4100";
+// --- CONFIG ---
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://princeio-api.onrender.com';
+const SIGNALING_URL = process.env.NEXT_PUBLIC_SIGNALING_URL || 'https://princeio.onrender.com';
 
-type Role = "host" | "viewer" | "";
-type IceServer = { urls: string[]; username?: string; credential?: string };
-type ChatMessage = { sender: string; message: string; timestamp: number };
+export default function LandingPage() {
+  const [view, setView] = useState<'landing' | 'session'>('landing');
+  const [sessionCode, setSessionCode] = useState('');
+  const [status, setStatus] = useState('');
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-export default function Home() {
-  const [role, setRole] = useState<Role>("");
-  const [sessionCode, setSessionCode] = useState("");
-  const [permission, setPermission] = useState<"view" | "control">("view");
-  const [status, setStatus] = useState("idle");
-  const [iceServers, setIceServers] = useState<IceServer[]>([
-    { urls: ["stun:stun.l.google.com:19302"] }
-  ]);
-  const [log, setLog] = useState<string[]>([]);
-
-  // New feature states
-  const [sessionPassword, setSessionPassword] = useState("");
-  const [usePassword, setUsePassword] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState("");
-  const [annotationMode, setAnnotationMode] = useState(false);
-  const [annotationTool, setAnnotationTool] = useState("pen");
-  const [annotationColor, setAnnotationColor] = useState("#6366F1");
-
-  const socketRef = useRef<Socket | null>(null);
-  const pcRef = useRef<RTCPeerConnection | null>(null);
-  const dataChannelRef = useRef<RTCDataChannel | null>(null);
-  const localVideoRef = useRef<HTMLVideoElement | null>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const makingOfferRef = useRef(false);
-  const roleRef = useRef<Role>("");
-  const sessionCodeRef = useRef("");
-  const iceCandidateQueueRef = useRef<RTCIceCandidateInit[]>([]);
-  const isDrawingRef = useRef(false);
-  const lastPosRef = useRef<{ x: number; y: number } | null>(null);
-
-  const addLog = (message: string) => {
-    setLog((prev) => [message, ...prev].slice(0, 8));
-  };
-
-  const connectSocket = () => {
-    if (socketRef.current) return socketRef.current;
-    const socket = io(SIGNALING_URL, { transports: ["websocket"] });
-    socketRef.current = socket;
-
-    socket.on("connect", async () => {
-      if (roleRef.current === "host" && pcRef.current && !pcRef.current.localDescription) {
-        const offer = await pcRef.current.createOffer();
-        await pcRef.current.setLocalDescription(offer);
-        socket.emit("webrtc:offer", { sessionCode: sessionCodeRef.current, sdp: offer });
+  // --- SESSION LOGIC ---
+  useEffect(() => {
+    if (view === 'session' && !socket) {
+      initSession();
+    }
+    return () => {
+      if (socket) {
+        socket.disconnect();
+        setSocket(null);
       }
+    };
+  }, [view]);
+
+  const initSession = () => {
+    setStatus('Connecting to Signaling Server...');
+    const newSocket = io(SIGNALING_URL);
+    setSocket(newSocket);
+
+    newSocket.on('connect', () => {
+      setStatus('Joining session...');
+      newSocket.emit('viewer:join', { sessionCode });
     });
 
-    socket.on("webrtc:offer", async ({ sdp }) => {
-      if (roleRef.current !== "viewer") return;
-      const pc = pcRef.current ?? setupPeerConnection(iceServers);
-      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+    newSocket.on('session:error', ({ message }) => {
+      alert('Error: ' + message);
+      setView('landing');
+      newSocket.disconnect();
+    });
 
-      while (iceCandidateQueueRef.current.length > 0) {
-        const candidate = iceCandidateQueueRef.current.shift();
-        if (candidate) {
-          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+    newSocket.on('session:joined', () => {
+      setStatus('Waiting for host stream...');
+    });
+
+    // WebRTC
+    let pc: RTCPeerConnection;
+
+    newSocket.on('webrtc:offer', async ({ sdp }) => {
+      setStatus('Received Stream Offer...');
+      pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+
+      pc.onconnectionstatechange = () => {
+        const s = pc.connectionState;
+        console.log('Connection State:', s);
+        if (s === 'connected') setStatus('Connected (P2P Secured)');
+        else if (s === 'utils') setStatus('Negotiating connection...');
+        else if (s === 'failed') setStatus('P2P Connection Failed. Check Firewalls.');
+      };
+
+      pc.ontrack = (event) => {
+        console.log('Track received:', event.streams[0]);
+        setStatus(''); // Clear buffer status
+        if (videoRef.current) {
+          videoRef.current.srcObject = event.streams[0];
+          // FORCE PLAY
+          videoRef.current.play().catch(e => {
+            console.error('Autoplay blocked:', e);
+            setStatus('Click screen to play video');
+          });
         }
-      }
+      };
 
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          newSocket.emit('webrtc:ice', { sessionCode, candidate: event.candidate });
+        }
+      };
+
+      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      socket.emit("webrtc:answer", { sessionCode: sessionCodeRef.current, sdp: answer });
+      newSocket.emit('webrtc:answer', { sessionCode, sdp: answer });
     });
 
-    socket.on("webrtc:answer", async ({ sdp }) => {
-      if (roleRef.current !== "host") return;
-      const pc = pcRef.current;
-      if (!pc) return;
-      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+    newSocket.on('webrtc:ice', async (candidate) => {
+      if (pc) await pc.addIceCandidate(new RTCIceCandidate(candidate));
+    });
 
-      while (iceCandidateQueueRef.current.length > 0) {
-        const candidate = iceCandidateQueueRef.current.shift();
-        if (candidate) {
-          await pc.addIceCandidate(new RTCIceCandidate(candidate));
-        }
+    // INPUT HANDLING (Mouse/Keyboard)
+    const handleInput = (e: MouseEvent | KeyboardEvent) => {
+      // Only send input if we are in the session view
+      const eventData: any = { type: e.type };
+
+      if (e instanceof MouseEvent && videoRef.current) {
+        const rect = videoRef.current.getBoundingClientRect();
+        const scaleX = videoRef.current.videoWidth / rect.width;
+        const scaleY = videoRef.current.videoHeight / rect.height;
+
+        // If video isn't playing yet, ignore
+        if (!videoRef.current.videoWidth) return;
+
+        eventData.x = (e.clientX - rect.left) * scaleX;
+        eventData.y = (e.clientY - rect.top) * scaleY;
+        eventData.button = e.button === 0 ? 'left' : e.button === 2 ? 'right' : 'middle';
       }
-    });
 
-    socket.on("webrtc:ice", async ({ candidate }) => {
-      const pc = pcRef.current;
-      if (!pc || !candidate) return;
-
-      if (!pc.remoteDescription) {
-        iceCandidateQueueRef.current.push(candidate);
-        return;
+      if (e instanceof KeyboardEvent) {
+        eventData.key = e.key;
+        eventData.keyCode = e.keyCode;
+        eventData.modifiers = [];
+        if (e.ctrlKey) eventData.modifiers.push('control');
+        if (e.shiftKey) eventData.modifiers.push('shift');
+        if (e.altKey) eventData.modifiers.push('alt');
       }
 
-      try {
-        await pc.addIceCandidate(new RTCIceCandidate(candidate));
-      } catch (error) {
-        addLog(`ICE candidate error: ${(error as Error).message}`);
-      }
-    });
+      newSocket.emit('control:event', { sessionCode, event: eventData });
 
-    socket.on("viewer:joined", async () => {
-      if (roleRef.current !== "host") return;
-      const pc = pcRef.current;
-      if (!pc) return;
-
-      if (makingOfferRef.current) return;
-      try {
-        makingOfferRef.current = true;
-        const offer = await pc.createOffer({ iceRestart: true });
-        await pc.setLocalDescription(offer);
-        socket.emit("webrtc:offer", { sessionCode: sessionCodeRef.current, sdp: offer });
-      } catch (err) {
-        console.error("Error handling viewer join:", err);
-      } finally {
-        makingOfferRef.current = false;
-      }
-    });
-
-    socket.on("session:terminated", () => {
-      addLog("Session terminated");
-      setStatus("terminated");
-      cleanup();
-    });
-
-    // Chat events
-    socket.on("chat:message", ({ message, sender, timestamp }) => {
-      setChatMessages(prev => [...prev, { message, sender, timestamp }]);
-    });
-
-    // Annotation events
-    socket.on("annotation:draw", (data) => {
-      drawOnCanvas(data);
-    });
-
-    socket.on("annotation:clear", () => {
-      clearCanvas();
-    });
-
-    return socket;
-  };
-
-  const setupPeerConnection = (servers: IceServer[]) => {
-    const pc = new RTCPeerConnection({ iceServers: servers });
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        socketRef.current?.emit("webrtc:ice", {
-          sessionCode: sessionCodeRef.current,
-          candidate: event.candidate
-        });
+      // Prevent default behavior for some keys/clicks to avoid browser actions
+      if (e.type !== 'mousemove' && e.type !== 'keyup') {
+        // e.preventDefault(); // Optional: careful not to block ESC
       }
     };
 
-    if (roleRef.current === "host") {
-      pc.onnegotiationneeded = async () => {
-        if (makingOfferRef.current) return;
-        try {
-          makingOfferRef.current = true;
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          socketRef.current?.emit("webrtc:offer", { sessionCode: sessionCodeRef.current, sdp: offer });
-        } catch (err) {
-          console.error("Error on negotiation needed:", err);
-        } finally {
-          makingOfferRef.current = false;
-        }
-      };
-    }
+    // Attach listeners to window for broad capture
+    window.addEventListener('mousemove', handleInput);
+    window.addEventListener('mousedown', handleInput);
+    window.addEventListener('mouseup', handleInput);
+    window.addEventListener('keydown', handleInput);
+    window.addEventListener('keyup', handleInput);
 
-    pc.ontrack = (event) => {
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = event.streams[0];
-      }
-    };
-
-    pcRef.current = pc;
-    return pc;
-  };
-
-  const startShare = async () => {
-    setStatus("sharing");
-    const stream = await navigator.mediaDevices.getDisplayMedia({
-      video: true,
-      audio: false
-    });
-
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = stream;
-    }
-
-    const pc = setupPeerConnection(iceServers);
-    stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-    const dataChannel = pc.createDataChannel("control");
-    dataChannel.onmessage = (event) => {
-      addLog(`Control event: ${event.data}`);
-    };
-    dataChannelRef.current = dataChannel;
-    addLog("Host ready. Waiting for viewer...");
-
-    // Note: Manual offer creation removed here to avoid race condition with onnegotiationneeded.
-    // Adding tracks/dataChannel above will trigger onnegotiationneeded automatically.
-  };
-
-  const joinSession = async () => {
-    setStatus("joining");
-    try {
-      const baseUrl = API_URL.replace(/\/$/, "");
-      const res = await fetch(`${baseUrl}/sessions/${sessionCode}/join`, {
-        method: "POST"
-      });
-      if (!res.ok) {
-        addLog(`Join failed: ${res.status} ${res.statusText}`);
-        setStatus("error");
-        return;
-      }
-      const data = await res.json();
-      const servers = data.iceServers ?? iceServers;
-      setIceServers(servers);
-      const pc = setupPeerConnection(servers);
-      pc.ondatachannel = (event) => {
-        dataChannelRef.current = event.channel;
-        event.channel.onopen = () => {
-          addLog("Control channel opened");
-        };
-        event.channel.onclose = () => {
-          addLog("Control channel closed");
-        };
-      };
-      connectSocket();
-      socketRef.current?.emit("viewer:join", { sessionCode: sessionCodeRef.current });
-      setStatus("connected");
-      addLog("Viewer connected");
-    } catch (error) {
-      addLog(`Join error: ${(error as Error).message}`);
-      setStatus("error");
-    }
-  };
-
-  const createSession = async () => {
-    setStatus("creating");
-    try {
-      const baseUrl = API_URL.replace(/\/$/, "");
-      const res = await fetch(`${baseUrl}/sessions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          permission,
-          password: usePassword ? sessionPassword : undefined
-        })
-      });
-      if (!res.ok) {
-        addLog(`Create failed: ${res.status} ${res.statusText}`);
-        try {
-          const errorData = await res.text();
-          console.error("Create session error detail:", errorData);
-          addLog(`Error details: ${errorData.slice(0, 50)}`);
-        } catch (e) {
-          console.error("Could not read error body", e);
-        }
-        setStatus("error");
-        return;
-      }
-      const data = await res.json();
-      setSessionCode(data.sessionCode);
-      sessionCodeRef.current = data.sessionCode;
-      setRole("host");
-      roleRef.current = "host";
-      connectSocket();
-      socketRef.current?.emit("host:register", { sessionCode: data.sessionCode });
-      setStatus("ready");
-      addLog(`Session created: ${data.sessionCode}`);
-    } catch (error) {
-      addLog(`Create error: ${(error as Error).message}`);
-      setStatus("error");
-    }
-  };
-
-  const sendChatMessage = () => {
-    if (!chatInput.trim()) return;
-    const sender = role === "host" ? "Host" : "Viewer";
-    socketRef.current?.emit("chat:message", {
-      sessionCode: sessionCodeRef.current,
-      message: chatInput,
-      sender
-    });
-    setChatInput("");
-  };
-
-  const drawOnCanvas = (data: any) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.strokeStyle = data.color;
-    ctx.lineWidth = data.tool === "highlighter" ? 20 : 3;
-    ctx.lineCap = "round";
-    ctx.globalAlpha = data.tool === "highlighter" ? 0.3 : 1;
-
-    ctx.beginPath();
-    ctx.moveTo(data.lastX, data.lastY);
-    ctx.lineTo(data.x, data.y);
-    ctx.stroke();
-  };
-
-  const clearCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-  };
-
-  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!annotationMode) return;
-    isDrawingRef.current = true;
-    const rect = e.currentTarget.getBoundingClientRect();
-    lastPosRef.current = {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
+    return () => {
+      // Cleanup if needed
     };
   };
 
-  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!annotationMode || !isDrawingRef.current || !lastPosRef.current) return;
+  if (view === 'session') {
+    return (
+      <div className="fixed inset-0 bg-black flex items-center justify-center overflow-hidden">
+        {/* Status Overlay */}
+        {status && (
+          <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-slate-900/90 border border-slate-700 text-white px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-3 backdrop-blur-md">
+            <div className="w-2.5 h-2.5 bg-yellow-400 rounded-full animate-pulse shadow-[0_0_10px_#facc15]" />
+            <span className="font-mono text-sm tracking-wide">{status}</span>
+          </div>
+        )}
 
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+        {/* Remote Video Stream */}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="w-full h-full object-contain cursor-none pointer-events-none"
+          onContextMenu={(e) => e.preventDefault()}
+        />
 
-    const data = {
-      x,
-      y,
-      lastX: lastPosRef.current.x,
-      lastY: lastPosRef.current.y,
-      color: annotationColor,
-      tool: annotationTool
-    };
+        {/* Instructions */}
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/40 text-xs font-mono pointer-events-none">
+          Click to interact • ESC to exit
+        </div>
 
-    drawOnCanvas(data);
-    socketRef.current?.emit("annotation:draw", {
-      sessionCode: sessionCodeRef.current,
-      data
-    });
+        <button
+          onClick={() => window.location.reload()}
+          className="absolute top-6 right-6 bg-red-600/80 hover:bg-red-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold z-50 backdrop-blur-sm transition-all shadow-lg hover:shadow-red-600/20"
+        >
+          Exit Session
+        </button>
+      </div>
+    );
+  }
 
-    lastPosRef.current = { x, y };
-  };
-
-  const handleCanvasMouseUp = () => {
-    isDrawingRef.current = false;
-    lastPosRef.current = null;
-  };
-
-  const cleanup = () => {
-    pcRef.current?.close();
-    pcRef.current = null;
-    socketRef.current?.disconnect();
-    socketRef.current = null;
-    iceCandidateQueueRef.current = [];
-  };
-
-  useEffect(() => {
-    roleRef.current = role;
-  }, [role]);
-
-  useEffect(() => {
-    sessionCodeRef.current = sessionCode;
-  }, [sessionCode]);
-
-  useEffect(() => () => cleanup(), []);
-
-  const canStartShare = useMemo(() => role === "host" && status === "ready", [role, status]);
-  const isHost = role === "host";
-
+  // --- LANDING PAGE ---
   return (
-    <main>
-      <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-          <svg width="40" height="40" viewBox="0 0 640 640" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M320 160L380 220L440 160L500 220L440 280L500 340L440 400L380 340L320 400L260 340L320 280L260 220L320 160Z" fill="url(#gradient1)" />
-            <rect x="160" y="280" width="320" height="240" rx="20" stroke="url(#gradient2)" strokeWidth="20" fill="none" />
-            <path d="M280 520L320 560L360 520" stroke="url(#gradient2)" strokeWidth="20" strokeLinecap="round" />
-            <defs>
-              <linearGradient id="gradient1" x1="260" y1="160" x2="500" y2="400" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#6366F1" />
-                <stop offset="1" stopColor="#06B6D4" />
-              </linearGradient>
-              <linearGradient id="gradient2" x1="160" y1="280" x2="480" y2="560" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#6366F1" />
-                <stop offset="1" stopColor="#06B6D4" />
-              </linearGradient>
-            </defs>
-          </svg>
-          <h1>PrinceIO</h1>
-        </div>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '1.05rem', marginBottom: '0.5rem' }}>
-          Professional Remote Desktop Control
-          <span className="feature-badge new">💬 Chat</span>
-          <span className="feature-badge new">📁 Files</span>
-          <span className="feature-badge new">✏️ Annotate</span>
-          <span className="feature-badge new">🔒 Secure</span>
-        </p>
-        <div className="status-badge">
-          <span style={{
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%',
-            background: status === 'connected' || status === 'sharing' ? 'var(--success)' : 'var(--text-muted)',
-            display: 'inline-block'
-          }}></span>
-          {status.charAt(0).toUpperCase() + status.slice(1)}
-        </div>
-      </div>
+    <main className="min-h-screen bg-[#0F172A] selection:bg-indigo-500/30 selection:text-indigo-200 font-sans overflow-x-hidden">
+      <Navbar />
 
-      <div className="grid">
-        <div className="card">
-          <div className="label">🖥️ Host Control Panel</div>
-          <div style={{ marginBottom: '1rem' }}>
-            <div style={{ background: 'rgba(99, 102, 241, 0.1)', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', border: '1px solid var(--primary)' }}>
-              <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
-                <strong>🚀 Want to share YOUR screen?</strong>
-              </p>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                To allow remote control, you must run the desktop app.
-              </p>
-              <a
-                href="https://drive.google.com/file/d/1LZt6c1lblyhxLXoJsv9CTAiUdDlu4Stk/view?usp=sharing"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  padding: '10px',
-                  background: 'var(--primary)',
-                  color: 'white',
-                  textAlign: 'center',
-                  borderRadius: '6px',
-                  textDecoration: 'none',
-                  fontWeight: 600
-                }}
-              >
-                📥 Download Host App
-              </a>
-              <div style={{ marginTop: '0.8rem', fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'left' }}>
-                <strong>Instructions:</strong>
-                <ol style={{ paddingLeft: '1.2rem', margin: '0.5rem 0 0' }}>
-                  <li style={{ marginBottom: '0.2rem' }}>Download & Extract the Zip file</li>
-                  <li style={{ marginBottom: '0.2rem' }}>Open folder & run <code>princeio.exe</code></li>
-                  <li>Click "More Info" &rarr; "Run" if warned</li>
-                </ol>
-              </div>
-            </div>
+      {/* HERO */}
+      <section className="relative pt-32 pb-20 md:pt-48 md:pb-32 px-6">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-indigo-600/20 blur-[100px] rounded-full pointer-events-none opacity-50" />
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center relative z-10">
 
-            <div style={{ borderTop: '1px solid var(--border)', margin: '1.5rem 0', position: 'relative' }}>
-              <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: '#0F172A', padding: '0 10px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                OR (View Only)
+          <div className="text-center lg:text-left">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/50 border border-indigo-500/30 text-indigo-300 text-xs font-semibold mb-6">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
               </span>
+              Now available for Windows
             </div>
-
-            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-              Permission Level
-            </label>
-            <select value={permission} onChange={(e) => setPermission(e.target.value as "view" | "control")} style={{ marginBottom: '1rem' }}>
-              <option value="view">👁️ View Only</option>
-              <option value="control">🎮 Full Control</option>
-            </select>
-
-            <button onClick={createSession} style={{ width: '100%', marginTop: '0.5rem' }}>
-              Create Web Session
-            </button>
+            <h1 className="text-5xl md:text-7xl font-bold text-white tracking-tight leading-[1.1] mb-6">
+              Instant Remote <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Desktop Control</span>
+            </h1>
+            <p className="text-lg text-slate-400 mb-8 max-w-xl mx-auto lg:mx-0 leading-relaxed">
+              Access your computer from anywhere using just a web browser. No installation required for the viewer.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
+              <a href="#download" className="px-8 py-4 bg-white text-slate-900 rounded-xl font-bold hover:bg-indigo-50 transition-colors shadow-lg shadow-white/10 w-full sm:w-auto">
+                Download Host App
+              </a>
+              <a href="#features" className="px-8 py-4 bg-slate-800 text-white border border-slate-700 rounded-xl font-bold hover:bg-slate-700 transition-colors w-full sm:w-auto">
+                Learn More
+              </a>
+            </div>
           </div>
 
-          {sessionCode && isHost && (
-            <div>
-              <div className="label">Session Code</div>
-              <div className="session-code" title="Click to copy">
-                {sessionCode}
+          <div className="relative group">
+            <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
+            <div className="relative bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
+              <div className="mb-6 text-center">
+                <h3 className="text-2xl font-bold text-white mb-2">Join a Session</h3>
+                <p className="text-slate-400 text-sm">Enter the code provided by the host</p>
               </div>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', margin: '0.5rem 0 1rem' }}>
-                Share this code with your viewer
-              </p>
-              <button disabled={!canStartShare} onClick={startShare} style={{ width: '100%' }}>
-                {status === 'sharing' ? '✓ Sharing Screen' : 'Start Screen Share'}
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="card">
-          <div className="label">👁️ Viewer Access</div>
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-              Enter Session Code
-            </label>
-            <input
-              placeholder="Enter code (e.g., ABC12345)"
-              value={sessionCode}
-              onChange={(e) => {
-                const value = e.target.value.toUpperCase();
-                sessionCodeRef.current = value;
-                setSessionCode(value);
-              }}
-              style={{ marginBottom: '1rem' }}
-            />
-            <button
-              disabled={isHost}
-              onClick={() => {
-                if (isHost) {
-                  addLog("Open a second browser tab to join as viewer");
-                  return;
-                }
-                setRole("viewer");
-                roleRef.current = "viewer";
-                joinSession();
-              }}
-              style={{ width: '100%' }}
-            >
-              {isHost ? 'Already Hosting' : 'Join Session'}
-            </button>
-          </div>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '1rem', lineHeight: '1.5' }}>
-            💡 Open a second browser tab or use a different device to join as a viewer
-          </p>
-        </div>
-      </div>
-
-      {/* Video Streams */}
-      {(isHost && status === 'sharing') || (role === 'viewer' && status === 'connected') ? (
-        <div className="grid" style={{ marginTop: '2rem' }}>
-          {isHost && status === 'sharing' && (
-            <div className="card">
-              <div className="label">🖥️ Your Screen (Host Preview)</div>
-              <video ref={localVideoRef} autoPlay muted playsInline style={{ width: '100%', borderRadius: '8px' }} />
-            </div>
-          )}
-
-          {role === 'viewer' && status === 'connected' && (
-            <div className="card">
-              <div className="label">🖥️ Remote Screen</div>
-              <div style={{ position: 'relative' }}>
-                <div
-                  style={{ position: 'relative', cursor: permission === 'control' ? 'crosshair' : 'default' }}
-                  onMouseMove={(e) => {
-                    if (permission !== 'control' || role !== 'viewer') return;
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    // Send normalized coordinates (0.0 to 1.0)
-                    const x = (e.clientX - rect.left) / rect.width;
-                    const y = (e.clientY - rect.top) / rect.height;
-
-                    socketRef.current?.emit('control:event', {
-                      sessionCode: sessionCodeRef.current,
-                      event: { type: 'mousemove', x, y }
-                    });
-                  }}
-                  onClick={(e) => {
-                    if (permission !== 'control' || role !== 'viewer') return;
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const x = (e.clientX - rect.left) / rect.width;
-                    const y = (e.clientY - rect.top) / rect.height;
-
-                    socketRef.current?.emit('control:event', {
-                      sessionCode: sessionCodeRef.current,
-                      event: { type: 'click', x, y, button: 'left' }
-                    });
-                  }}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    if (permission !== 'control' || role !== 'viewer') return;
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const x = (e.clientX - rect.left) / rect.width;
-                    const y = (e.clientY - rect.top) / rect.height;
-
-                    socketRef.current?.emit('control:event', {
-                      sessionCode: sessionCodeRef.current,
-                      event: { type: 'click', x, y, button: 'right' }
-                    });
-                  }}
-                  tabIndex={0}
-                >
-                  <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '100%', borderRadius: '8px' }} />
-                  <canvas
-                    ref={canvasRef}
-                    className={`annotation-canvas ${annotationMode ? 'drawing' : ''}`}
-                    width={800}
-                    height={600}
-                    onMouseDown={handleCanvasMouseDown}
-                    onMouseMove={handleCanvasMouseMove}
-                    onMouseUp={handleCanvasMouseUp}
-                    onMouseLeave={handleCanvasMouseUp}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Session Code</label>
+                  <input
+                    type="text"
+                    placeholder="123-456"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-4 text-center text-2xl font-mono text-white tracking-widest focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-slate-600"
+                    value={sessionCode}
+                    onChange={(e) => setSessionCode(e.target.value.toUpperCase())}
                   />
-                  {permission === 'control' && (
-                    <div className="control-active">
-                      🎮 CONTROL ACTIVE
-                    </div>
-                  )}
                 </div>
+                <button
+                  onClick={() => { if (sessionCode.length >= 6) setView('session'); }}
+                  disabled={sessionCode.length < 6}
+                  className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  <span>Connect Now</span>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                </button>
               </div>
             </div>
-          )}
-        </div>
-      ) : null}
-
-      {/* Event Log */}
-      <div className="card" style={{ marginTop: '2rem' }}>
-        <div className="label">📋 Activity Log</div>
-        <div className="event-log">
-          <ul>
-            {log.map((item, idx) => (
-              <li key={idx}>{item}</li>
-            ))}
-          </ul>
-        </div>
-      </div>
-
-      {/* Floating Action Buttons */}
-      {(status === 'sharing' || status === 'connected') && (
-        <div className="fab-container">
-          <button className="fab" onClick={() => setChatOpen(!chatOpen)} title="Chat">
-            💬
-          </button>
-          <button className="fab secondary" onClick={() => setAnnotationMode(!annotationMode)} title="Annotate">
-            ✏️
-          </button>
-        </div>
-      )}
-
-      {/* Chat Window */}
-      {chatOpen && (
-        <div className="chat-container">
-          <div className="chat-header">
-            <strong>💬 Chat</strong>
-            <button onClick={() => setChatOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0, width: 'auto' }}>
-              ✕
-            </button>
           </div>
-          <div className="chat-messages">
-            {chatMessages.map((msg, idx) => (
-              <div key={idx} className={`chat-message ${msg.sender === (role === 'host' ? 'Host' : 'Viewer') ? 'own' : 'other'}`}>
-                <div className="chat-sender">{msg.sender}</div>
-                <div className="chat-text">{msg.message}</div>
+        </div>
+      </section>
+
+      {/* FEATURES */}
+      <section id="features" className="py-20 bg-slate-900/50">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[
+              { title: "Zero Install Viewer", desc: "Access from any browser immediately.", icon: "⚡" },
+              { title: "High Performance", desc: "Low latency WebRTC streaming.", icon: "🚀" },
+              { title: "Secure Access", desc: "End-to-End Encrypted sessions.", icon: "🔒" }
+            ].map((f, i) => (
+              <div key={i} className="bg-slate-800/50 border border-white/5 p-8 rounded-2xl hover:bg-slate-800 transition-colors">
+                <div className="text-4xl mb-4">{f.icon}</div>
+                <h3 className="text-xl font-bold text-white mb-2">{f.title}</h3>
+                <p className="text-slate-400 leading-relaxed">{f.desc}</p>
               </div>
             ))}
           </div>
-          <div className="chat-input-container">
-            <input
-              className="chat-input"
-              placeholder="Type a message..."
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
-            />
-            <button className="chat-send-btn" onClick={sendChatMessage}>
-              Send
-            </button>
+        </div>
+      </section>
+
+      {/* DOWNLOAD */}
+      <section id="download" className="py-20 px-6">
+        <div className="max-w-5xl mx-auto bg-gradient-to-br from-indigo-900/50 to-purple-900/50 border border-indigo-500/20 rounded-3xl p-12 text-center relative overflow-hidden">
+          <div className="relative z-10">
+            <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Ready to start hosting?</h2>
+            <a
+              href="https://drive.google.com/file/d/1LZt6c1lblyhxLXoJsv9CTAiUdDlu4Stk/view?usp=sharing"
+              target="_blank"
+              className="inline-flex items-center gap-3 bg-white text-indigo-900 px-8 py-4 rounded-xl font-bold text-lg hover:bg-indigo-50 transition-transform hover:scale-105 shadow-xl"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4 4m4 4V4" /></svg>
+              Download for Windows (x64)
+            </a>
           </div>
         </div>
-      )}
+      </section>
 
-      {/* Annotation Toolbar */}
-      {annotationMode && (
-        <div className="annotation-toolbar">
-          <button
-            className={`annotation-tool ${annotationTool === 'pen' ? 'active' : ''}`}
-            onClick={() => setAnnotationTool('pen')}
-            title="Pen"
-          >
-            ✏️
-          </button>
-          <button
-            className={`annotation-tool ${annotationTool === 'highlighter' ? 'active' : ''}`}
-            onClick={() => setAnnotationTool('highlighter')}
-            title="Highlighter"
-          >
-            🖍️
-          </button>
-          <input
-            type="color"
-            value={annotationColor}
-            onChange={(e) => setAnnotationColor(e.target.value)}
-            style={{ width: '40px', height: '40px', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
-            title="Color"
-          />
-          <button
-            className="annotation-tool"
-            onClick={() => {
-              clearCanvas();
-              socketRef.current?.emit("annotation:clear", { sessionCode: sessionCodeRef.current });
-            }}
-            title="Clear"
-          >
-            🗑️
-          </button>
-        </div>
-      )}
-
-      {/* Footer */}
-      <div style={{ textAlign: 'center', marginTop: '3rem', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-        <p>Powered by PrinceIO • Professional Remote Desktop Control</p>
-        <p style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
-          Secure • Fast • Feature-Rich • Free Forever
-        </p>
-      </div>
+      <Footer />
+      <Chatbot />
     </main>
   );
 }

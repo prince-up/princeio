@@ -2,10 +2,10 @@ import { app, BrowserWindow, desktopCapturer, ipcMain } from 'electron';
 import { io, Socket } from 'socket.io-client';
 import robot from 'robotjs';
 import * as path from 'path';
-import 'dotenv/config';
 
-const API_URL = process.env.API_URL || 'http://localhost:4000';
-const SIGNALING_URL = process.env.SIGNALING_URL || 'http://localhost:4100';
+// Hardcoded URLs for Production
+const API_URL = 'https://princeio-api.onrender.com';
+const SIGNALING_URL = 'https://princeio.onrender.com';
 
 let mainWindow: BrowserWindow | null = null;
 let socket: Socket | null = null;
@@ -23,7 +23,6 @@ function createWindow() {
         },
     });
 
-    // Load a simple HTML interface
     mainWindow.loadFile(path.join(__dirname, '../index.html'));
 
     mainWindow.on('closed', () => {
@@ -35,21 +34,25 @@ function createWindow() {
 // Create session via API
 async function createSession(permission: 'view' | 'control') {
     try {
+        console.log(`Creating session at: ${API_URL}/sessions`);
         const response = await fetch(`${API_URL}/sessions`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
             body: JSON.stringify({ permission }),
         });
 
         if (!response.ok) {
-            throw new Error(`Failed to create session: ${response.status}`);
+            const text = await response.text();
+            throw new Error(`Failed: ${response.status} ${text}`);
         }
 
         const data = await response.json() as any;
         sessionCode = data.sessionCode;
         isControlEnabled = permission === 'control';
 
-        // Connect to signaling server
         connectSignaling();
 
         return data;
@@ -97,13 +100,13 @@ function connectSignaling() {
 // Handle control events (mouse, keyboard)
 function handleControlEvent(event: any) {
     try {
+        // console.log('Control Event:', event.type); // Uncomment for verbose logging
         const { type, x, y, button, key, keyCode, modifiers } = event;
         const screenSize = robot.getScreenSize();
         const width = screenSize.width;
         const height = screenSize.height;
 
         // Convert normalized coordinates (0-1) to screen pixels
-        // If x,y are > 1, assume they are legacy absolute pixels and leave them alone
         const targetX = (x <= 1 ? x * width : x);
         const targetY = (y <= 1 ? y * height : y);
 
