@@ -74,6 +74,8 @@ export default function LandingPage() {
     });
 
     let pc: RTCPeerConnection;
+    const candidateBuffer: any[] = [];
+
     newSocket.on('webrtc:offer', async ({ sdp }) => {
       setStatus('Negotiating Connection...');
       pc = new RTCPeerConnection(ICE_SERVERS);
@@ -88,22 +90,41 @@ export default function LandingPage() {
         console.log('Track received:', event.streams[0]);
         if (videoRef.current) {
           videoRef.current.srcObject = event.streams[0];
-          // We rely on 'onPlaying' to clear the status, or the Force Play button
+          videoRef.current.play().catch(() => setStatus('Click to start video'));
         }
       };
 
       pc.onicecandidate = (event) => {
-        if (event.candidate) newSocket.emit('webrtc:ice', { sessionCode, candidate: event.candidate });
+        if (event.candidate) {
+          newSocket.emit('webrtc:ice', {
+            sessionCode: sessionCode.trim(),
+            candidate: event.candidate
+          });
+        }
       };
 
       await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+
+      // Add buffered candidates
+      while (candidateBuffer.length > 0) {
+        const candidate = candidateBuffer.shift();
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      }
+
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      newSocket.emit('webrtc:answer', { sessionCode, sdp: answer });
+      newSocket.emit('webrtc:answer', {
+        sessionCode: sessionCode.trim(),
+        sdp: answer
+      });
     });
 
-    newSocket.on('webrtc:ice', async (candidate) => {
-      if (pc) await pc.addIceCandidate(new RTCIceCandidate(candidate));
+    newSocket.on('webrtc:ice', async ({ candidate }) => {
+      if (pc && pc.remoteDescription) {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } else {
+        candidateBuffer.push(candidate);
+      }
     });
 
     // INPUT HANDLING - IMPROVED PRECISION
