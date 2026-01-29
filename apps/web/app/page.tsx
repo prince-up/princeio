@@ -10,25 +10,31 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://princeio-api.onrende
 const SIGNALING_URL = process.env.NEXT_PUBLIC_SIGNALING_URL || 'https://princeio.onrender.com';
 
 // ROBUST ICE SERVERS
-// ROBUST ICE SERVERS
 const ICE_SERVERS = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:global.stun.twilio.com:3478' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun.relay.metered.ca:80' },
     {
-      urls: 'turn:openrelay.metered.ca:80',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
+      urls: 'turn:global.relay.metered.ca:80',
+      username: 'a8cdc17c6b6dbe4db7a3f24c',
+      credential: 'Ht9CFVE+1i1SY8DF'
     },
     {
-      urls: 'turn:openrelay.metered.ca:443',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
+      urls: 'turn:global.relay.metered.ca:80?transport=tcp',
+      username: 'a8cdc17c6b6dbe4db7a3f24c',
+      credential: 'Ht9CFVE+1i1SY8DF'
     },
     {
-      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
+      urls: 'turn:global.relay.metered.ca:443',
+      username: 'a8cdc17c6b6dbe4db7a3f24c',
+      credential: 'Ht9CFVE+1i1SY8DF'
+    },
+    {
+      urls: 'turns:global.relay.metered.ca:443?transport=tcp',
+      username: 'a8cdc17c6b6dbe4db7a3f24c',
+      credential: 'Ht9CFVE+1i1SY8DF'
     }
   ],
   iceCandidatePoolSize: 10,

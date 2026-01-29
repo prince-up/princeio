@@ -20,23 +20,38 @@ type SessionState = {
 const sessions = new Map<string, SessionState>();
 
 io.on("connection", (socket) => {
+  console.log(`New connection: ${socket.id}`);
+
   socket.on("host:register", ({ sessionCode }: { sessionCode: string }) => {
     const code = sessionCode.toUpperCase();
+    console.log(`Host registering session: ${code} (socket: ${socket.id})`);
     const state = sessions.get(code) ?? { viewers: new Set<string>() };
     state.hostSocketId = socket.id;
     sessions.set(code, state);
     socket.join(code);
+    console.log(`Session ${code} registered. Total sessions: ${sessions.size}`);
   });
 
   socket.on("viewer:join", ({ sessionCode }: { sessionCode: string }) => {
     const code = sessionCode.toUpperCase();
-    const state = sessions.get(code) ?? { viewers: new Set<string>() };
-    state.viewers.add(socket.id);
-    sessions.set(code, state);
-    socket.join(code);
-    if (state.hostSocketId) {
-      io.to(state.hostSocketId).emit("viewer:joined", { viewerId: socket.id });
+    console.log(`Viewer joining session: ${code}`);
+    const state = sessions.get(code);
+
+    if (!state || !state.hostSocketId) {
+      console.log(`Session not found or no host: ${code}`);
+      socket.emit("session:error", { message: "Session not found or host not connected" });
+      return;
     }
+
+    state.viewers.add(socket.id);
+    socket.join(code);
+
+    // Notify viewer they joined successfully
+    socket.emit("session:joined", { sessionCode: code });
+
+    // Notify host that viewer joined
+    console.log(`Notifying host ${state.hostSocketId} that viewer joined`);
+    io.to(state.hostSocketId).emit("viewer:joined", { viewerId: socket.id });
   });
 
   socket.on("webrtc:offer", ({ sessionCode, sdp }) => {

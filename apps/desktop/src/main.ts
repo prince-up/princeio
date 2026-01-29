@@ -213,8 +213,10 @@ ipcMain.handle('get-sources', async () => {
 });
 
 // IPC handlers
-ipcMain.handle('create-session', async (event, data: { permission: 'view' | 'control' }) => {
-    const permission = typeof data === 'string' ? data : data.permission;
+ipcMain.handle('create-session', async (event, data: any) => {
+    // Handle both object { permission: 'control' } and direct string 'control'
+    const permission: 'view' | 'control' = typeof data === 'string' ? data : (data?.permission || 'control');
+    console.log('Create session called with permission:', permission);
     return await createSession(permission);
 });
 
