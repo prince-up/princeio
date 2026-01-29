@@ -10,14 +10,28 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://princeio-api.onrende
 const SIGNALING_URL = process.env.NEXT_PUBLIC_SIGNALING_URL || 'https://princeio.onrender.com';
 
 // ROBUST ICE SERVERS
+// ROBUST ICE SERVERS
 const ICE_SERVERS = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' }
-  ]
+    { urls: 'stun:global.stun.twilio.com:3478' },
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    }
+  ],
+  iceCandidatePoolSize: 10,
 };
 
 export default function LandingPage() {
@@ -68,10 +82,10 @@ export default function LandingPage() {
       };
 
       pc.ontrack = (event) => {
-        setStatus('');
+        console.log('Track received:', event.streams[0]);
         if (videoRef.current) {
           videoRef.current.srcObject = event.streams[0];
-          videoRef.current.play().catch(() => setStatus('Click screen to enable video'));
+          // We rely on 'onPlaying' to clear the status, or the Force Play button
         }
       };
 
@@ -171,10 +185,33 @@ export default function LandingPage() {
         style={{ position: 'fixed', inset: 0, background: 'black', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         onMouseMove={() => { setShowControls(true); setTimeout(() => setShowControls(false), 3000); }}
       >
+        {/* Connection Status Overlay */}
         {status && (
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-slate-900/90 border border-white/10 px-8 py-4 rounded-full text-white backdrop-blur-md z-50 flex items-center gap-3 shadow-2xl">
-            <div className="w-2 h-2 bg-indigo-500 rounded-full animate-ping"></div>
-            {status}
+            <div className={`w-3 h-3 rounded-full ${status === 'Connected' ? 'bg-green-500' : 'bg-amber-500 animate-pulse'}`}></div>
+            <span className="font-medium">{status}</span>
+          </div>
+        )}
+
+        {/* Fallback for Black Screen / Buffering */}
+        {!status && (!videoRef.current || videoRef.current.paused || videoRef.current.readyState < 3) && (
+          <div className="absolute z-40 flex flex-col items-center gap-4">
+            <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="text-white/80 text-sm bg-black/50 px-4 py-2 rounded-lg backdrop-blur-sm">
+              Buffering Stream... <br />
+              <span className="text-xs text-white/50">Ensure Host App is running & not minimized</span>
+            </div>
+            <button
+              onClick={() => {
+                if (videoRef.current) {
+                  videoRef.current.play().catch(e => alert(e.message));
+                  setStatus('');
+                }
+              }}
+              className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-xs backdrop-blur-md transition-colors"
+            >
+              Force Play Video
+            </button>
           </div>
         )}
 
@@ -183,6 +220,12 @@ export default function LandingPage() {
           autoPlay
           playsInline
           muted
+          onLoadedMetadata={() => {
+            setStatus('');
+            videoRef.current?.play().catch(() => setStatus('Click to start video'));
+          }}
+          onPlaying={() => setStatus('')}
+          onWaiting={() => setStatus('Buffering...')}
           style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: showControls ? 'default' : 'none' }}
           onContextMenu={(e) => e.preventDefault()}
         />
