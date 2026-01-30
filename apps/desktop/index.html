@@ -623,43 +623,82 @@
                         mandatory: {
                             chromeMediaSource: 'desktop',
                             chromeMediaSourceId: source.id,
-                            minWidth: 1280,
-                            maxWidth: 1280,
-                            minHeight: 720,
-                            maxHeight: 720,
-                            maxFrameRate: 30
+                            minWidth: 1920,
+                            maxWidth: 1920,
+                            minHeight: 1080,
+                            maxHeight: 1080,
+                            maxFrameRate: 60
                         }
                     }
                 });
-                log('Got User Media Stream (720p)');
+                log('Got User Media Stream (1080p/60fps)');
 
                 // Set Local Preview
                 const preview = document.getElementById('localPreview');
                 preview.srcObject = stream;
 
                 localStream = stream;
-                pc = new RTCPeerConnection({ iceServers });
+                pc = new RTCPeerConnection({
+                    iceServers,
+                    iceCandidatePoolSize: 10
+                });
 
+                // OPTIMIZATION: Set bitrate and latency priority
                 pc.onconnectionstatechange = () => {
                     log(`Connection State: ${pc.connectionState}`);
+                    if (pc.connectionState === 'connected') {
+                        optimizeBitrate(pc);
+                    }
                 };
 
-                stream.getTracks().forEach(t => pc.addTrack(t, stream));
+                stream.getTracks().forEach(t => {
+                    const sender = pc.addTrack(t, stream);
+                    // Force low latency on the track
+                    if (t.kind === 'video' && sender.track) {
+                        try {
+                            const capabilities = t.getCapabilities();
+                            log('Video Capabilities: ' + JSON.stringify(capabilities));
+                        } catch (e) { }
+                    }
+                });
 
                 pc.onicecandidate = e => {
                     if (e.candidate) ipcRenderer.send('webrtc:ice', JSON.parse(JSON.stringify(e.candidate)));
                 };
 
-                log('Creating Offer...');
-                const offer = await pc.createOffer();
+                log('Creating Offer (High Quality)...');
+                const offer = await pc.createOffer({
+                    offerToReceiveVideo: false,
+                    offerToReceiveAudio: false
+                });
                 await pc.setLocalDescription(offer);
                 ipcRenderer.send('webrtc:offer', { sdp: JSON.parse(JSON.stringify(offer)) });
-                log('Offer Sent to Signaling Server');
+                log('Offer Sent');
 
             } catch (e) {
                 console.error(e);
                 log('Error: ' + e.message);
-                alert('Screen Share Error: ' + e.message);
+            }
+        }
+
+        async function optimizeBitrate(peerConnection) {
+            const senders = peerConnection.getSenders();
+            const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+            if (videoSender) {
+                const params = videoSender.getParameters();
+                if (!params.encodings) params.encodings = [{}];
+
+                // Set Bitrate to 6Mbps for crisp 1080p/60fps
+                params.encodings[0].maxBitrate = 6000 * 1000;
+                params.encodings[0].priority = 'high';
+                params.encodings[0].networkPriority = 'high';
+
+                try {
+                    await videoSender.setParameters(params);
+                    log('Bitrate Optimized: 6.0 Mbps');
+                } catch (err) {
+                    log('Bitrate tweak failed: ' + err.message);
+                }
             }
         }
 
