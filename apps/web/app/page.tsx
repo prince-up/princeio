@@ -292,7 +292,7 @@ export default function LandingPage() {
             <a href="#" style={{ color: '#94a3b8' }}>Features</a>
             <a href="#" style={{ color: '#94a3b8' }}>Download</a>
           </div>
-          <a href="https://drive.google.com/file/d/1LZt6c1lblyhxLXoJsv9CTAiUdDlu4Stk/view?usp=sharing" target="_blank" className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}>Get App</a>
+          <a href="https://drive.google.com/file/d/1fCplgZ4TplPoEZvzjn3aUkVxOw-fONrU/view?usp=sharing" target="_blank" className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}>Get App</a>
         </div>
       </nav>
 
@@ -309,7 +309,7 @@ export default function LandingPage() {
             <span style={{ color: 'white', fontWeight: 'bold' }}> 60 FPS. Zero Latency.</span>
           </p>
           <div className="flex gap-4 flex-col-mobile">
-            <a href="https://drive.google.com/file/d/1LZt6c1lblyhxLXoJsv9CTAiUdDlu4Stk/view?usp=sharing" target="_blank" className="btn btn-primary">Download Host App</a>
+            <a href="https://drive.google.com/file/d/1fCplgZ4TplPoEZvzjn3aUkVxOw-fONrU/view?usp=sharing" target="_blank" className="btn btn-primary">Download Host App</a>
             <a href="#features" className="btn btn-secondary">Learn More</a>
           </div>
         </div>
